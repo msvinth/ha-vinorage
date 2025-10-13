@@ -25,4 +25,5 @@ class VinorageEntity(CoordinatorEntity[VinorageDataUpdateCoordinator]):
                     coordinator.config_entry.entry_id,
                 ),
             },
+            name="Vinorage",
         )
