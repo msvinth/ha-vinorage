@@ -9,6 +9,9 @@ from typing import Any
 import aiohttp
 import async_timeout
 
+# Constants
+MAX_BRIGHTNESS = 100
+
 
 class VinorageApiClientError(Exception):
     """Exception to indicate a general API error."""
@@ -69,8 +72,8 @@ class VinorageApiClient:
 
     async def async_set_led_brightness(self, brightness: int) -> None:
         """Set the LED brightness (0-100)."""
-        if not 0 <= brightness <= 100:
-            msg = f"Brightness must be between 0 and 100, got {brightness}"
+        if not 0 <= brightness <= MAX_BRIGHTNESS:
+            msg = f"Brightness must be between 0 and {MAX_BRIGHTNESS}, got {brightness}"
             raise ValueError(msg)
 
         try:
@@ -100,6 +103,7 @@ class VinorageApiClient:
 
         Args:
             command: 0 = stop, 1 = up, 2 = down
+
         """
         if command not in (0, 1, 2):
             msg = f"Command must be 0 (stop), 1 (up), or 2 (down), got {command}"

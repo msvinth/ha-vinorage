@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
@@ -33,7 +33,7 @@ class VinorageLight(VinorageEntity, LightEntity):
     """Vinorage LED light class."""
 
     _attr_color_mode = ColorMode.BRIGHTNESS
-    _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
+    _attr_supported_color_modes: ClassVar[set[ColorMode]] = {ColorMode.BRIGHTNESS}
     _attr_name = "LED Light"
     _attr_icon = "mdi:lightbulb"
 
