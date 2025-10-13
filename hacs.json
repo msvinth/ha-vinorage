@@ -1,6 +1,7 @@
 {
-    "name": "Integration blueprint",
+    "name": "Vinorage",
     "hide_default_branch": true,
-    "homeassistant": "2024.6.0",
+    "homeassistant": "2025.2.4",
+    "hacs": "2.0.5",
     "render_readme": true
 }
