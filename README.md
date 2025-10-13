@@ -1,47 +1,221 @@
-# Notice
+# Vinorage Wine Cellar Integration for Home Assistant
 
-The component and platforms in this repository are not meant to be used by a
-user, but as a "blueprint" that custom component developers can build
-upon, to make more awesome stuff.
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
 
-HAVE FUN! 😎
+A custom Home Assistant integration for controlling [Vinorage](https://vinorage.dk/en/) wine cellars with elevation.
 
-## Why?
+## About Vinorage
 
-This is simple, by having custom_components look (README + structure) the same
-it is easier for developers to help each other and for users to start using them.
+Vinorage manufactures premium wine storage solutions with built-in elevation systems that allow wine cellars to be mounted flush with the floor and raised when needed. This integration allows you to control your Vinorage wine cellar directly from Home Assistant.
 
-If you are a developer and you want to add things to this "blueprint" that you think more
-developers will have use for, please open a PR to add it :)
+## Compatibility
 
-## What?
+This integration has been tested with:
+- **[Vinorage Wine Cellar with Elevation (200 bottles)](https://vinorage.dk/en/produkt/vinorage-wine-cellar-with-elevation-exclusive-and-optimal-wine-storage/)** - Exclusive model with elevation system
 
-This repository contains multiple files, here is a overview:
+Other Vinorage models with similar web-based control interfaces may also work, but have not been tested.
 
-File | Purpose | Documentation
--- | -- | --
-`.devcontainer.json` | Used for development/testing with Visual Studio Code. | [Documentation](https://code.visualstudio.com/docs/remote/containers)
-`.github/ISSUE_TEMPLATE/*.yml` | Templates for the issue tracker | [Documentation](https://help.github.com/en/github/building-a-strong-community/configuring-issue-templates-for-your-repository)
-`.vscode/tasks.json` | Tasks for the devcontainer. | [Documentation](https://code.visualstudio.com/docs/editor/tasks)
-`custom_components/integration_blueprint/*` | Integration files, this is where everything happens. | [Documentation](https://developers.home-assistant.io/docs/creating_component_index)
-`CONTRIBUTING.md` | Guidelines on how to contribute. | [Documentation](https://help.github.com/en/github/building-a-strong-community/setting-guidelines-for-repository-contributors)
-`LICENSE` | The license file for the project. | [Documentation](https://help.github.com/en/github/creating-cloning-and-archiving-repositories/licensing-a-repository)
-`README.md` | The file you are reading now, should contain info about the integration, installation and configuration instructions. | [Documentation](https://help.github.com/en/github/writing-on-github/basic-writing-and-formatting-syntax)
-`requirements.txt` | Python packages used for development/lint/testing this integration. | [Documentation](https://pip.pypa.io/en/stable/user_guide/#requirements-files)
+## Features
 
-## How?
+This integration provides control over two main components of your Vinorage wine cellar:
 
-1. Create a new repository in GitHub, using this repository as a template by clicking the "Use this template" button in the GitHub UI.
-1. Open your new repository in Visual Studio Code devcontainer (Preferably with the "`Dev Containers: Clone Repository in Named Container Volume...`" option).
-1. Rename all instances of the `integration_blueprint` to `custom_components/<your_integration_domain>` (e.g. `custom_components/awesome_integration`).
-1. Rename all instances of the `Integration Blueprint` to `<Your Integration Name>` (e.g. `Awesome Integration`).
-1. Run the `scripts/develop` to start HA and test out your new integration.
+### 🔆 LED Light Control
+- **Entity Type**: Light
+- **Features**:
+  - Brightness control (0-100%)
+  - On/Off control
+  - Current brightness state monitoring
 
-## Next steps
+### �� Wine Cellar Elevation
+- **Entity Type**: Cover
+- **Features**:
+  - Raise cellar (Open)
+  - Lower cellar (Close)
+  - Stop movement
+  - Stateless operation (position not tracked)
 
-These are some next steps you may want to look into:
-- Add tests to your integration, [`pytest-homeassistant-custom-component`](https://github.com/MatthewFlamm/pytest-homeassistant-custom-component) can help you get started.
-- Add brand images (logo/icon) to https://github.com/home-assistant/brands.
-- Create your first release.
-- Share your integration on the [Home Assistant Forum](https://community.home-assistant.io/).
-- Submit your integration to [HACS](https://hacs.xyz/docs/publish/start).
+### ⚙️ Configuration Options
+- **IP Address**: Local network address of your Vinorage device
+- **Scan Interval**: How often to poll the device for LED status (default: 15 seconds, set to 0 to disable)
+
+## Installation
+
+### HACS (Recommended)
+
+1. Open HACS in Home Assistant
+2. Click on "Integrations"
+3. Click the three dots in the top right corner
+4. Select "Custom repositories"
+5. Add this repository URL: `https://github.com/msvinth/ha-vinorage`
+6. Select category "Integration"
+7. Click "Add"
+8. Click "Install" on the Vinorage card
+9. Restart Home Assistant
+
+### Manual Installation
+
+1. Download the latest release from the [releases page](https://github.com/msvinth/ha-vinorage/releases)
+2. Extract the `vinorage` folder from the archive
+3. Copy the `vinorage` folder to your Home Assistant's `custom_components` directory
+4. Restart Home Assistant
+
+## Configuration
+
+### Adding the Integration
+
+1. In Home Assistant, go to **Settings** → **Devices & Services**
+2. Click **+ Add Integration**
+3. Search for "Vinorage"
+4. Enter your Vinorage device's local IP address (e.g., `192.168.1.100`)
+5. Optionally adjust the scan interval (default: 15 seconds)
+6. Click **Submit**
+
+### Finding Your Device's IP Address
+
+Your Vinorage wine cellar must be connected to your local network. You can find its IP address by:
+- Checking your router's connected devices list
+- Using a network scanning app
+- Checking your DHCP server logs
+
+**Note**: It's recommended to assign a static IP address to your Vinorage device in your router settings to prevent the IP from changing.
+
+## Usage
+
+### LED Light
+
+Once configured, you'll see a light entity named **"LED Light"**:
+
+```yaml
+# Example automation to turn on LED at 50% brightness
+automation:
+  - alias: "Wine cellar ambient lighting"
+    trigger:
+      - platform: sun
+        event: sunset
+    action:
+      - service: light.turn_on
+        target:
+          entity_id: light.vinorage_led_light
+        data:
+          brightness_pct: 50
+```
+
+### Wine Cellar Cover
+
+The cover entity **"Wine Cellar"** controls the elevation:
+
+```yaml
+# Example automation to raise cellar when someone approaches
+automation:
+  - alias: "Raise wine cellar"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.wine_room_motion
+        to: "on"
+    action:
+      - service: cover.open_cover
+        target:
+          entity_id: cover.vinorage_wine_cellar
+
+# Don't forget to lower it after a delay
+  - alias: "Lower wine cellar"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.wine_room_motion
+        to: "off"
+        for:
+          minutes: 5
+    action:
+      - service: cover.close_cover
+        target:
+          entity_id: cover.vinorage_wine_cellar
+```
+
+## Entities Created
+
+| Entity ID | Type | Description |
+|-----------|------|-------------|
+| `light.vinorage_led_light` | Light | Controls LED brightness |
+| `cover.vinorage_wine_cellar` | Cover | Controls cellar elevation |
+
+## Technical Details
+
+### Polling
+
+The integration polls the device at the configured interval to update the LED brightness state. The cellar position is not tracked as the device does not provide position feedback.
+
+## Troubleshooting
+
+### Integration won't connect
+
+- Verify the IP address is correct
+- Ensure the device is powered on and connected to your network
+- Try accessing `http://[IP_ADDRESS]` in a web browser to verify the device responds
+- Check that Home Assistant can reach the device (same network/VLAN)
+
+### LED state not updating
+
+- Check the scan interval is not set to 0
+- Verify the device is responding (check in a web browser)
+- Look at Home Assistant logs for any error messages
+
+### Cover position shows as "Unknown"
+
+This is normal behavior. The Vinorage device does not report position, so the cover entity is stateless.
+
+## Development
+
+### Setting up Development Environment
+
+This repository includes a devcontainer for easy development:
+
+```bash
+# Clone the repository
+git clone https://github.com/msvinth/ha-vinorage
+cd ha-vinorage
+
+# Open in VS Code with devcontainer
+code .
+```
+
+### Running Home Assistant
+
+```bash
+# Start Home Assistant in development mode
+scripts/develop
+```
+
+### Linting
+
+```bash
+# Run linters
+scripts/lint
+```
+
+## Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+
+## Support
+
+If you encounter any issues or have questions:
+- Check the [troubleshooting section](#troubleshooting) above
+- Search [existing issues](https://github.com/msvinth/ha-vinorage/issues)
+- Open a [new issue](https://github.com/msvinth/ha-vinorage/issues/new) with detailed information
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Disclaimer
+
+This is an unofficial integration and is not affiliated with, endorsed by, or supported by Vinorage. Use at your own risk.
+
+## Credits
+
+- Integration developed by [msvinth](https://github.com/msvinth)
+- Built using the [Home Assistant Integration Blueprint](https://github.com/ludeeus/integration_blueprint)
+
+---
+
+**Enjoy your perfectly stored wine! 🍷**
