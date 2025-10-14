@@ -79,65 +79,6 @@ Your Vinorage wine cellar must be connected to your local network. You can find 
 
 **Note**: It's recommended to assign a static IP address to your Vinorage device in your router settings to prevent the IP from changing.
 
-## Usage
-
-### LED Light
-
-Once configured, you'll see a light entity named **"LED Light"**:
-
-```yaml
-# Example automation to turn on LED at 50% brightness
-automation:
-  - alias: "Wine cellar ambient lighting"
-    trigger:
-      - platform: sun
-        event: sunset
-    action:
-      - service: light.turn_on
-        target:
-          entity_id: light.vinorage_led_light
-        data:
-          brightness_pct: 50
-```
-
-### Wine Cellar Cover
-
-The cover entity **"Wine Cellar"** controls the elevation:
-
-```yaml
-# Example automation to raise cellar when someone approaches
-automation:
-  - alias: "Raise wine cellar"
-    trigger:
-      - platform: state
-        entity_id: binary_sensor.wine_room_motion
-        to: "on"
-    action:
-      - service: cover.open_cover
-        target:
-          entity_id: cover.vinorage_wine_cellar
-
-# Don't forget to lower it after a delay
-  - alias: "Lower wine cellar"
-    trigger:
-      - platform: state
-        entity_id: binary_sensor.wine_room_motion
-        to: "off"
-        for:
-          minutes: 5
-    action:
-      - service: cover.close_cover
-        target:
-          entity_id: cover.vinorage_wine_cellar
-```
-
-## Entities Created
-
-| Entity ID | Type | Description |
-|-----------|------|-------------|
-| `light.vinorage_led_light` | Light | Controls LED brightness |
-| `cover.vinorage_wine_cellar` | Cover | Controls cellar elevation |
-
 ## Technical Details
 
 ### Polling
