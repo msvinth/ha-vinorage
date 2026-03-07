@@ -21,7 +21,7 @@ SCAN_INTERVAL_SCHEMA = vol.Schema(
             CONF_SCAN_INTERVAL,
         ): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0,
+                min=5,
                 max=300,
                 step=1,
                 unit_of_measurement="seconds",
@@ -89,7 +89,7 @@ class VinorageFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                         ),
                     ): selector.NumberSelector(
                         selector.NumberSelectorConfig(
-                            min=0,
+                            min=5,
                             max=300,
                             step=1,
                             unit_of_measurement="seconds",

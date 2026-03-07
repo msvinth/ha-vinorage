@@ -9,4 +9,4 @@ ATTRIBUTION = "Data provided by Vinorage wine cellar"
 
 # Configuration
 CONF_SCAN_INTERVAL = "scan_interval"
-DEFAULT_SCAN_INTERVAL = 15  # seconds
+DEFAULT_SCAN_INTERVAL = 30  # seconds

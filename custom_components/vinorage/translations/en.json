@@ -9,7 +9,7 @@
                 },
                 "data_description": {
                     "host": "The local IP address of your Vinorage device (e.g., 192.168.1.100)",
-                    "scan_interval": "How often to poll the device for updates. Set to 0 to disable automatic polling."
+                    "scan_interval": "How often to poll the device for updates (minimum 5 seconds)."
                 }
             },
             "reconfigure": {
@@ -35,7 +35,7 @@
                     "scan_interval": "Update interval (seconds)"
                 },
                 "data_description": {
-                    "scan_interval": "How often to poll the device for updates. Set to 0 to disable automatic polling."
+                    "scan_interval": "How often to poll the device for updates (minimum 5 seconds)."
                 }
             }
         }
