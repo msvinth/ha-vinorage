@@ -43,6 +43,7 @@ async def async_setup_entry(
 
     coordinator = VinorageDataUpdateCoordinator(
         hass=hass,
+        config_entry=entry,
         logger=LOGGER,
         name=DOMAIN,
         update_interval=update_interval,

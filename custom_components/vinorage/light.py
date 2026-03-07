@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
+    ColorMode,
     LightEntity,
 )
-from homeassistant.components.light.const import ColorMode
 
 from .entity import VinorageEntity
 
