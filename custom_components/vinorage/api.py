@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 import socket
 from typing import Any
 
 import aiohttp
-import async_timeout
 
 # Constants
 MAX_BRIGHTNESS = 100
@@ -44,7 +44,7 @@ class VinorageApiClient:
     async def async_get_data(self) -> dict[str, Any]:
         """Get data from the device by scraping the HTML page."""
         try:
-            async with async_timeout.timeout(10):
+            async with asyncio.timeout(10):
                 response = await self._session.get(self._base_url)
                 _verify_response_or_raise(response)
                 html = await response.text()
@@ -77,7 +77,7 @@ class VinorageApiClient:
             raise ValueError(msg)
 
         try:
-            async with async_timeout.timeout(10):
+            async with asyncio.timeout(10):
                 response = await self._session.post(
                     f"{self._base_url}/led_set",
                     data={"level": brightness},
@@ -110,7 +110,7 @@ class VinorageApiClient:
             raise ValueError(msg)
 
         try:
-            async with async_timeout.timeout(10):
+            async with asyncio.timeout(10):
                 response = await self._session.post(
                     f"{self._base_url}/act_control",
                     data={"act": command},
