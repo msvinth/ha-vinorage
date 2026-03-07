@@ -11,11 +11,33 @@
                     "host": "The local IP address of your Vinorage device (e.g., 192.168.1.100)",
                     "scan_interval": "How often to poll the device for updates. Set to 0 to disable automatic polling."
                 }
+            },
+            "reconfigure": {
+                "description": "Update the IP address for your Vinorage wine cellar.",
+                "data": {
+                    "host": "IP Address"
+                },
+                "data_description": {
+                    "host": "The local IP address of your Vinorage device (e.g., 192.168.1.100)"
+                }
             }
         },
         "error": {
             "cannot_connect": "Unable to connect to the Vinorage device. Please check the IP address and ensure the device is powered on and connected to your network.",
             "unknown": "An unexpected error occurred. Please try again."
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "description": "Adjust the polling interval for your Vinorage device.",
+                "data": {
+                    "scan_interval": "Update interval (seconds)"
+                },
+                "data_description": {
+                    "scan_interval": "How often to poll the device for updates. Set to 0 to disable automatic polling."
+                }
+            }
         }
     }
 }
