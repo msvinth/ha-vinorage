@@ -1,0 +1,226 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+WIFI_IF="en1"
+VIN_SSID="Vinorage"
+VIN_IP="172.217.28.1"
+VIN_SUBNET="172.217.28." # The Vinorage AP hands out leases in 172.217.28.0/24
+JOIN_WAIT=150             # Seconds to keep (re)joining until we get a lease on the AP
+PORTAL_WAIT=180           # Seconds to wait for the slow IoT captive portal to respond
+SLOW_HINT=60              # Suggest power cycling the device after this many seconds
+
+usage() {
+    echo "Usage: sudo $0 <HOME_SSID> <HOME_PASSWORD>"
+    echo "Example: sudo $0 \"MyWifi\" \"MySecretPass\""
+}
+
+if [[ $# -lt 2 ]]; then
+    usage
+    exit 1
+fi
+
+HOME_SSID="$1"
+HOME_PASS="$2"
+
+log() {
+    echo "[$(date '+%F %T')] $*"
+}
+
+if [[ $EUID -ne 0 ]]; then
+    log "This utility must be run with sudo."
+    usage
+    exit 1
+fi
+
+power_cycle_reminder() {
+    log "REMINDER: This is taking unusually long. The Vinorage device can get"
+    log "          sluggish after running for 1-2 months. Power cycling it"
+    log "          (unplug for about 10s, plug back in, wait for it to boot) often helps."
+}
+
+SUCCESS=0
+cleanup() {
+    route delete -host "$VIN_IP" 2>/dev/null || true
+    if [[ $SUCCESS -eq 1 ]]; then
+        log "Finished -- turning Wi-Fi off."
+    else
+        log "Script did not complete successfully -- turning Wi-Fi off."
+    fi
+    networksetup -setairportpower "$WIFI_IF" off 2>/dev/null || true
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+log "Enabling Wi-Fi..."
+if ! networksetup -setairportpower "$WIFI_IF" on; then
+    log "Failed to power on Wi-Fi on $WIFI_IF. Exiting."
+    exit 1
+fi
+
+# Give the radio time to come up and complete an initial scan so the
+# slow-to-appear Vinorage AP shows up in the scan results.
+sleep 8
+
+# Vinorage hardware is slow to boot/advertise. Important facts learned the hard way:
+#  - networksetup -setairportnetwork returns exit 0 even when it prints
+#    "Could not find network" (not yet in scan) or a transient "-3906 tmpErr".
+#  - networksetup -getairportnetwork is unreliable on macOS Sonoma/Sequoia.
+#  - "status: active" in ifconfig only means some Wi-Fi is up; macOS happily
+#    auto-roams back to a remembered home network (which has internet) instead of
+#    staying on the no-internet Vinorage AP.
+#  - The portal IP 172.217.28.1 is also a real public Google address, so if we
+#    are on the home network, curl to it silently hits the internet (HTTP 404).
+# The only reliable proof we are on the Vinorage AP is a DHCP lease inside
+# 172.217.28.0/24. Loop over join, force DHCP, and verify the subnet.
+linked() {
+    ifconfig "$WIFI_IF" 2>/dev/null | grep -q "status: active"
+}
+
+on_vin_subnet() {
+    local ip
+    ip=$(ipconfig getifaddr "$WIFI_IF" 2>/dev/null || true)
+    [[ "$ip" == ${VIN_SUBNET}* ]]
+}
+
+log "Joining $VIN_SSID and waiting for a lease on its subnet ${VIN_SUBNET}0/24 (up to ${JOIN_WAIT}s)..."
+join_deadline=$(($(date +%s) + JOIN_WAIT))
+on_subnet=0
+reminded=0
+start=$(date +%s)
+while [[ $(date +%s) -lt $join_deadline ]]; do
+    # Reissue the join every iteration. macOS may have roamed back to a
+    # remembered network, and reissuing also forces a fresh scan.
+    JOIN_OUT=$(networksetup -setairportnetwork "$WIFI_IF" "$VIN_SSID" 2>&1 || true)
+    [[ -n "$JOIN_OUT" ]] && log "join: $JOIN_OUT"
+
+    # Force a fresh DHCP lease on whatever we just associated with.
+    ipconfig set "$WIFI_IF" DHCP 2>/dev/null || true
+
+    # Give the slow AP time to associate and hand out a lease, then verify
+    # that the IP is really in the Vinorage subnet.
+    for _ in 1 2 3 4 5 6 7 8; do
+        IP=$(ipconfig getifaddr "$WIFI_IF" 2>/dev/null || true)
+        if [[ "$IP" == ${VIN_SUBNET}* ]]; then
+            on_subnet=1
+            break
+        fi
+        sleep 1
+    done
+    [[ $on_subnet -eq 1 ]] && break
+
+    log "Not on Vinorage subnet yet (current IP: ${IP:-none}). macOS may have"
+    log "roamed to a remembered network; retrying join..."
+    if [[ $reminded -eq 0 && $(($(date +%s) - start)) -ge $SLOW_HINT ]]; then
+        power_cycle_reminder
+        reminded=1
+    fi
+    sleep 3
+done
+
+if [[ $on_subnet -ne 1 ]]; then
+    log "Never got a lease on the Vinorage subnet (${VIN_SUBNET}0/24) within ${JOIN_WAIT}s."
+    log "macOS most likely keeps roaming back to a remembered Wi-Fi network that has"
+    log "internet. Tip: turn off auto-join for your home Wi-Fi (or temporarily forget"
+    log "it) in System Settings > Wi-Fi, then run this again."
+    power_cycle_reminder
+    exit 1
+fi
+log "On Vinorage AP -- got lease $IP. Portal is on-link at ${VIN_IP}."
+
+# Make sure no stale route to the portal lingers from a previous run. On the
+# Vinorage subnet the portal is directly on-link, so no route is needed.
+route delete -host "$VIN_IP" 2>/dev/null || true
+
+log "Waiting for portal at http://${VIN_IP}/ (up to ${PORTAL_WAIT}s, device is slow)..."
+deadline=$(($(date +%s) + PORTAL_WAIT))
+portal_ok=0
+reminded=0
+start=$(date +%s)
+while [[ $(date +%s) -lt $deadline ]]; do
+    # If macOS roamed off the no-internet AP, rejoin and reissue DHCP before
+    # curling. Otherwise 172.217.28.1 would reach the internet, not the device.
+    if ! on_vin_subnet; then
+        log "Drifted off Vinorage subnet (IP: $(ipconfig getifaddr "$WIFI_IF" 2>/dev/null || echo none)); re-joining..."
+        networksetup -setairportnetwork "$WIFI_IF" "$VIN_SSID" >/dev/null 2>&1 || true
+        ipconfig set "$WIFI_IF" DHCP 2>/dev/null || true
+        sleep 4
+        continue
+    fi
+
+    if curl -fsS --interface "$WIFI_IF" --max-time 10 "http://${VIN_IP}/" >/dev/null 2>&1; then
+        portal_ok=1
+        break
+    fi
+    if [[ $reminded -eq 0 && $(($(date +%s) - start)) -ge $SLOW_HINT ]]; then
+        power_cycle_reminder
+        reminded=1
+    fi
+    sleep 5
+done
+
+if [[ $portal_ok -ne 1 ]]; then
+    log "Portal never responded within ${PORTAL_WAIT}s. Exiting."
+    power_cycle_reminder
+    exit 1
+fi
+log "Portal is up."
+
+# Check immediately before sending credentials so they can never be posted to
+# the public address if macOS roams away from the Vinorage subnet.
+if ! on_vin_subnet; then
+    log "No longer on the Vinorage subnet just before sending credentials. Aborting"
+    log "to avoid leaking credentials to the internet. Please retry."
+    exit 1
+fi
+
+log "Sending credentials to Vinorage (SSID='${HOME_SSID}')..."
+SAVE_RESP=$(curl -sS --interface "$WIFI_IF" --max-time 30 --retry 3 --retry-delay 5 \
+    -w $'\n__HTTP_%{http_code}__' \
+    -G "http://${VIN_IP}/wifisave" \
+    --data-urlencode "s=${HOME_SSID}" \
+    --data-urlencode "p=${HOME_PASS}" 2>&1) || {
+    log "Failed to submit credentials to the portal. Exiting."
+    log "Response: ${SAVE_RESP}"
+    power_cycle_reminder
+    exit 1
+}
+
+# Pull the HTTP status code out of the trailer appended with -w.
+HTTP_CODE=$(printf '%s' "$SAVE_RESP" | sed -n 's/.*__HTTP_\([0-9]*\)__.*/\1/p')
+SAVE_BODY=$(printf '%s' "$SAVE_RESP" | sed 's/__HTTP_[0-9]*__//')
+log "Portal /wifisave HTTP ${HTTP_CODE:-?}. Response body:"
+printf '%s\n' "$SAVE_BODY"
+
+if [[ "$HTTP_CODE" != "200" ]]; then
+    log "Portal did not accept credentials (HTTP ${HTTP_CODE:-none}). Exiting."
+    power_cycle_reminder
+    exit 1
+fi
+
+log "Credentials accepted. The device will now reboot and try to join '${HOME_SSID}'."
+log "Waiting for the Vinorage AP to drop (we should lose the ${VIN_SUBNET}x lease)..."
+
+# After a successful save, WiFiManager reboots and the AP disappears. Detect
+# that by no longer holding a lease in the Vinorage subnet. If we stay on the
+# subnet, the save did not take.
+gone_deadline=$(($(date +%s) + 60))
+ap_gone=0
+while [[ $(date +%s) -lt $gone_deadline ]]; do
+    if ! linked || ! on_vin_subnet; then
+        ap_gone=1
+        break
+    fi
+    sleep 3
+done
+
+if [[ $ap_gone -eq 1 ]]; then
+    log "Vinorage AP dropped -- device is rebooting to join '${HOME_SSID}'. Looks good."
+else
+    log "WARNING: still on the Vinorage AP after 60s. The save may not have taken,"
+    log "         or the device could not join '${HOME_SSID}' (check SSID/password;"
+    log "         note ESP devices are 2.4 GHz only) and fell back to setup mode."
+fi
+log "Done."
+SUCCESS=1

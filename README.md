@@ -104,6 +104,16 @@ The integration polls the device at the configured interval to update the LED br
 
 This is normal behavior. The Vinorage device does not report position, so the cover entity is stateless.
 
+### Vinorage drops off Wi-Fi
+
+On a wired Mac with an unused Wi-Fi interface, the macOS recovery utility can reconnect the Vinorage device to the home network:
+
+```bash
+sudo scripts/reconnect-vinorage-wifi "HOME_SSID" "HOME_PASSWORD"
+```
+
+The utility must be run with `sudo`. It temporarily enables Wi-Fi, joins the `Vinorage` setup access point, submits the home network credentials, waits for the access point to disappear, and then disables Wi-Fi. It uses interface `en1`; update `WIFI_IF` in the script if the Mac uses a different Wi-Fi interface.
+
 ## Development
 
 ### Setting up Development Environment
